@@ -9,7 +9,7 @@ window.GAME_CONFIG = {
     // 1. 📏 比例與尺寸控制
     // ------------------------------------------
     scale: {
-        player: 0.9,
+        player: 1.0,
         goal: 0.4
     },
 
@@ -53,14 +53,14 @@ window.GAME_CONFIG = {
     // ------------------------------------------
     physics: {
 // [迷宮難度，數字越大越簡單] 
-        cellSize: 50,          
+        cellSize: 70,          
         ballRadiusRatio: 0.4, 
         friction: 0.94,        
         acceleration: 0.6,   
         // [移動速度控制] 
         // 數值越小 = 移動越慢
         // 建議範圍：4 (慢) ~ 15 (快)        
-        maxSpeed: 5,          
+        maxSpeed: 6,          
         keyboardForce: 1.5     
     },
 
@@ -116,6 +116,7 @@ window.GAME_CONFIG = {
         }
     }
 };
+
 
 
 
