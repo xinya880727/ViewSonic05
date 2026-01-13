@@ -55,7 +55,7 @@
             background-size: cover;
             background-position: center;
             
-            /* 預設 Flex 佈局，防止跑版 */
+            /* 預設 Flex 佈局 */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -139,7 +139,7 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* 新增：陀螺儀數值顯示，方便除錯 */
+        /* 除錯資訊 */
         #debug-info {
             position: fixed;
             bottom: 10px;
@@ -179,14 +179,12 @@
         // --- 1. 設定檔讀取 ---
         let currentConfig;
         
-        // 預設設定
         const DEFAULT_CONFIG = {
             scale: { player: 0.7, goal: 0.8 },
             physics: { cellSize: 50, ballRadiusRatio: 0.35, friction: 0.94, acceleration: 0.6, maxSpeed: 12, keyboardForce: 1.5 },
             assets: { gameBg: "", startScreenBg: "", endScreenBg: "", player: "", goal: "" },
             style: { wallColor: "#7f8c8d", wallGlow: true, wallThickness: 4, playerColor: "#e74c3c", goalColor: "#2ecc71" },
             text: { gameTitle: "迷宮逃脫", winTitle: "逃脫成功！", startMessage: "...", startButton: "開始", winMessage: "勝利！", nextLevelButton: "重試" },
-            // 預設文字樣式
             textStyle: {
                 title: { color: "#f1c40f", size: "2.5rem", shadow: "0 0 10px rgba(241, 196, 15, 0.5)", position: { top: "15%", left: "50%" } },
                 winTitle: { color: "#2ecc71", size: "3rem", shadow: "0 0 20px rgba(46, 204, 113, 0.8)", position: { top: "20%", left: "50%" } },
@@ -410,8 +408,7 @@
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            // 修改：移除平滑與加速度，直接速度映射 (Instant Movement)
-            // input.x/y 範圍約為 -1 到 1
+            // 即時反應
             ball.vx = input.x * CONFIG.maxSpeed;
             ball.vy = input.y * CONFIG.maxSpeed;
 
@@ -430,7 +427,6 @@
 
             let cell = mazeState.grid[currentR][currentC];
 
-            // 碰撞檢測 - 直接停止速度
             if (cell.walls.left && nextX - ball.radius < ox + currentC * size) {
                 nextX = ox + currentC * size + ball.radius;
             } else if (cell.walls.right && nextX + ball.radius > ox + (currentC + 1) * size) {
@@ -473,7 +469,6 @@
             let goalX = ox + goal.col * size + size * 0.5;
             let goalY = oy + goal.row * size + size * 0.5;
 
-            // Goal
             if (assetsLoaded.goal) {
                 let goalSize = size * SCALE.goal;
                 ctx.drawImage(sprites.goal, goalX - goalSize/2, goalY - goalSize/2, goalSize, goalSize);
@@ -486,7 +481,6 @@
                 ctx.stroke();
             }
 
-            // Walls
             ctx.strokeStyle = THEME.wallColor; ctx.lineWidth = THEME.wallThickness; ctx.lineCap = "round";
             if (THEME.wallGlow) { ctx.shadowBlur = 10; ctx.shadowColor = THEME.wallColor; } else { ctx.shadowBlur = 0; }
             ctx.beginPath();
@@ -502,7 +496,6 @@
             }
             ctx.stroke(); ctx.shadowBlur = 0; 
 
-            // Player
             if (assetsLoaded.player) {
                 let pSize = size * SCALE.player; 
                 ctx.drawImage(sprites.player, ball.x - pSize/2, ball.y - pSize/2, pSize, pSize);
@@ -539,63 +532,50 @@
 
         window.addEventListener('resize', () => {});
 
-        // 修正後的陀螺儀控制 (支援橫向/平板)
+        // 核心修正：陀螺儀方向處理
         function handleOrientation(event) {
-            let x = event.gamma; // 左/右傾斜
-            let y = event.beta;  // 前/後傾斜
+            const beta = event.beta;   // 前後 (直式) / 左右 (橫式)
+            const gamma = event.gamma; // 左右 (直式) / 前後 (橫式)
             
-            // 簡單的除錯資訊
-            debugInfo.innerText = `Gamma(X): ${x?.toFixed(1)}\nBeta(Y): ${y?.toFixed(1)}`;
+            if (beta === null || gamma === null) return;
 
-            if (x === null || y === null) return;
-
-            // 取得螢幕旋轉角度
-            let angle = 0;
-            if (window.screen && window.screen.orientation) {
-                angle = window.screen.orientation.angle;
-            } else if (typeof window.orientation !== 'undefined') {
-                angle = window.orientation;
-            }
+            // 使用視窗長寬比判斷：寬 > 高 視為橫式 (Landscape)
+            const isLandscape = window.innerWidth > window.innerHeight;
+            
+            debugInfo.innerText = `${isLandscape ? 'Landscape' : 'Portrait'}\nB:${beta?.toFixed(1)} G:${gamma?.toFixed(1)}`;
 
             let inputX = 0;
             let inputY = 0;
 
-            // 根據角度修正座標軸 (解決平板/橫向問題)
-            if (angle === 90) {
-                // 橫向 (Home 鍵在右)
-                inputX = y;
-                inputY = -x;
-            } else if (angle === -90 || angle === 270) {
-                // 橫向 (Home 鍵在左)
-                inputX = -y;
-                inputY = x;
-            } else if (angle === 180) {
-                // 倒置
-                inputX = -x;
-                inputY = -y;
+            if (isLandscape) {
+                // 橫式模式 (平板常見)
+                // 左右傾斜 (Beta) 控制 X 軸
+                // 前後傾斜 (Gamma) 控制 Y 軸
+                // 注意：Gamma 在裝置左側抬起時為負，所以需要反轉或對應
+                inputX = beta; 
+                inputY = -gamma; 
             } else {
-                // 直向 (預設)
-                inputX = x;
-                inputY = y;
+                // 直式模式 (手機常見)
+                // 左右傾斜 (Gamma) 控制 X 軸
+                // 前後傾斜 (Beta) 控制 Y 軸
+                inputX = gamma;
+                inputY = beta;
             }
 
-            debugInfo.innerText += `\nInX: ${inputX.toFixed(1)} InY: ${inputY.toFixed(1)}`;
-
-            // 調整靈敏度：只要傾斜 20 度就全速
-            const maxTilt = 20; 
+            const maxTilt = 20; // 20度即達全速
             
-            if (inputX > maxTilt) inputX = maxTilt; 
-            if (inputX < -maxTilt) inputX = -maxTilt;
-            if (inputY > maxTilt) inputY = maxTilt; 
-            if (inputY < -maxTilt) inputY = -maxTilt;
+            // 限制範圍
+            inputX = Math.max(-maxTilt, Math.min(maxTilt, inputX));
+            inputY = Math.max(-maxTilt, Math.min(maxTilt, inputY));
             
+            // 應用速度
             input.x = inputX / maxTilt;
             input.y = inputY / maxTilt;
         }
 
         window.addEventListener('keydown', (e) => {
             switch(e.key) {
-                case 'ArrowUp': input.y = -1; break; // 鍵盤也改為直接速度
+                case 'ArrowUp': input.y = -1; break;
                 case 'ArrowDown': input.y = 1; break;
                 case 'ArrowLeft': input.x = -1; break;
                 case 'ArrowRight': input.x = 1; break;
