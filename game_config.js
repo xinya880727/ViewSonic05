@@ -55,7 +55,7 @@ window.GAME_CONFIG = {
         ballRadiusRatio: 0.35, 
         friction: 0.94,        
         acceleration: 0.6,     
-        maxSpeed: 12,          
+        maxSpeed: 7,          
         keyboardForce: 1.5     
     },
 
@@ -111,3 +111,4 @@ window.GAME_CONFIG = {
         }
     }
 };
+
