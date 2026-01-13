@@ -331,13 +331,12 @@
             const offsetX = (canvas.width - cols * finalSize) / 2;
             const offsetY = (canvas.height - rows * finalSize) / 2;
 
-            // [核心修正] 計算速度縮放比例 (實際格子大小 / 預設格子大小)
-            // 當格子變小 (手機版)，這個比例會小於 1，讓速度變慢
+            // 計算縮放比例 (實際/預設)
             const speedScale = finalSize / CONFIG.cellSize;
 
             mazeState = {
                 cols: cols, rows: rows, cellSize: finalSize, offsetX: offsetX, offsetY: offsetY, grid: [],
-                speedScale: speedScale // 儲存這個比例供 update 使用
+                speedScale: speedScale
             };
 
             generateMaze();
@@ -409,14 +408,12 @@
             goal.row = rows - 1;
         }
 
-        // --- 物理更新 (加入速度自動縮放) ---
+        // --- 物理更新 ---
         function update(dt) {
             if (!isPlaying) return;
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            // [核心修正] 應用速度縮放
-            // 基礎最大速度 * 縮放比例
             const effectiveSpeed = CONFIG.maxSpeed * (mazeState.speedScale || 1);
 
             ball.vx = input.x * effectiveSpeed;
@@ -490,7 +487,14 @@
                 ctx.stroke();
             }
 
-            ctx.strokeStyle = THEME.wallColor; ctx.lineWidth = THEME.wallThickness; ctx.lineCap = "round";
+            ctx.strokeStyle = THEME.wallColor; 
+            ctx.lineCap = "round";
+            
+            // [關鍵修正] 牆壁粗細隨格子大小自動縮放
+            // 避免在小格子(手機)時牆壁看起來太粗
+            const scaleFactor = size / CONFIG.cellSize;
+            ctx.lineWidth = Math.max(1, THEME.wallThickness * scaleFactor);
+
             if (THEME.wallGlow) { ctx.shadowBlur = 10; ctx.shadowColor = THEME.wallColor; } else { ctx.shadowBlur = 0; }
             ctx.beginPath();
             for (let r = 0; r < rows; r++) {
@@ -541,7 +545,6 @@
 
         window.addEventListener('resize', () => {});
 
-        // [陀螺儀方向修正版]
         function handleOrientation(event) {
             let rawBeta = event.beta;  
             let rawGamma = event.gamma; 
