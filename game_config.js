@@ -30,7 +30,7 @@ window.GAME_CONFIG = {
     style: {
         wallColor: "#4B678E", 
         wallGlow: false,  
-// [迷宮線粗]         
+        // [迷宮線粗]         
         wallThickness: 5,     
         playerColor: "#e74c3c", 
         goalColor: "#2ecc71"
@@ -41,10 +41,10 @@ window.GAME_CONFIG = {
     // ------------------------------------------
     text: {
         gameTitle: "迷宮",
-        startMessage: "<br>傾斜裝置或滑動滑鼠來移動。",
+        startMessage: "傾斜裝置或滑動滑鼠<br>控制移動方向", // 縮短文字，手機版更好看
         winTitle: "逃脫成功！", 
         startButton: "開始逃脫",
-        winMessage: "<br>耗時: <span style='color:#f1c40f'>{time}</span> 秒",
+        winMessage: "耗時: <span style='color:#f1c40f'>{time}</span> 秒",
         nextLevelButton: "再次挑戰"
     },
 
@@ -52,39 +52,35 @@ window.GAME_CONFIG = {
     // 5. ⚙️ 物理與迷宮參數
     // ------------------------------------------
     physics: {
-// [迷宮難度，數字越大越簡單] 
+        // [迷宮難度基準] 
         cellSize: 60,          
+        
         ballRadiusRatio: 0.4, 
         friction: 0.94,        
         acceleration: 0.6,   
-        // [移動速度控制] 
-        // 數值越小 = 移動越慢
-        // 建議範圍：4 (慢) ~ 15 (快)        
-        maxSpeed: 6,          
+        maxSpeed: 6,           
         keyboardForce: 1.5     
     },
 
     // ------------------------------------------
-    // 6. 🔠 文字外觀與位置設定 (新增 position)
-    //    單位可用: px, %, rem, vh, vw
-    //    若設定 top/bottom/left/right，物件會變為絕對定位
+    // 6. 🔠 文字外觀與位置設定 (手機防疊版)
     // ------------------------------------------
     textStyle: {
-        // [遊戲標題]
+        // [遊戲標題] - 再往上移一點
         title: {
             color: "#000000",
-            size: "6rem",
+            // 縮小字體範圍：最小 2rem，避免手機橫向時佔滿畫面
+            size: "clamp(2rem, 10vw, 5rem)", 
             shadow: "0 0 0px rgba(241, 196, 15, 0.5)",
-            // 位置設定 (距離上方 15%，水平置中)
-            position: { bottom: "50%", left: "50%" } 
+            position: { top: "10%", left: "50%" } 
         },
 
-       // [遊戲結束-勝利標題] (新增)
+       // [遊戲結束-勝利標題]
         winTitle: {
             color: "#2ecc71",
-            size: "6rem",
+            size: "clamp(2rem, 10vw, 5rem)",
             shadow: "0 0 20px rgba(46, 204, 113, 0.8)",
-            position: { bottom: "50%", left: "50%" } 
+            position: { top: "10%", left: "50%" } 
         },
 
         // [開始畫面-說明文字]
@@ -92,8 +88,8 @@ window.GAME_CONFIG = {
             color: "#000000",
             size: "1.2rem",
             shadow: "0px 0px 1px rgba(0,0,0,0.8)",
-            // 位置設定 (距離上方 20%，水平置中)
-            position: { bottom: "35%", left: "50%" }
+            // 放在中間偏上，避開按鈕
+            position: { top: "40%", left: "50%" }
         },
 
         // [結束畫面-勝利文字]
@@ -101,29 +97,17 @@ window.GAME_CONFIG = {
             color: "#ffffff",
             size: "1.2rem",
             shadow: "0 0 15px rgba(255, 255, 255, 0.6)",
-            // 位置設定 (距離上方 35%，水平置中)
-            position: { bottom: "35%", left: "50%" }
+            position: { top: "40%", left: "50%" }
         },
 
-        // [按鈕]
+        // [按鈕] - 再往下移一點
         button: {
             color: "#000000",
             bgColor: "linear-gradient(135deg, #FFC73B 100%, #FFC73B 100%)",
             size: "1.3rem",
             shadow: "0 5px 15px rgba(0, 0, 0, 0)",
-            // 位置設定 (距離下方 20%，水平置中)
-            position: { bottom: "40%", left: "50%" }
+            // 沉底
+            position: { bottom: "10%", left: "50%" }
         }
     }
 };
-
-
-
-
-
-
-
-
-
-
-
