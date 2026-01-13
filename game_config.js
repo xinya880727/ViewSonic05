@@ -53,7 +53,7 @@ window.GAME_CONFIG = {
     // ------------------------------------------
     physics: {
 // [迷宮難度，數字越大越簡單] 
-        cellSize: 70,          
+        cellSize: 60,          
         ballRadiusRatio: 0.4, 
         friction: 0.94,        
         acceleration: 0.6,   
@@ -116,6 +116,7 @@ window.GAME_CONFIG = {
         }
     }
 };
+
 
 
 
