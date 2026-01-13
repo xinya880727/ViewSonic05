@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>迷宮逃脫 - 自訂參數版</title>
+    
+    <!-- 引入外部設定檔 -->
+    <script src="game_config.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            touch-action: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #ecf0f1;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-image: radial-gradient(circle at center, #2c3e50 0%, #000000 100%);
+            background-size: cover;
+            background-position: center;
+        }
+
+        #game-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            background: transparent;
+            z-index: 1; 
+        }
+
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* UI 覆蓋層 - 全螢幕 */
+        #ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: transparent;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            text-align: center;
+            padding: 20px;
+            transition: background-color 0.5s ease, opacity 0.3s ease;
+            pointer-events: auto;
+        }
+
+        #ui-layer.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 預設樣式，會被 JS 設定覆蓋 */
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: #f1c40f;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+        }
+
+        p {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            color: #bdc3c7;
+            max-width: 80%;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        button {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.3rem;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
+            transition: all 0.2s ease;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(2px);
+            filter: brightness(0.9);
+        }
+
+        #info-bar {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: monospace;
+            font-size: 18px;
+            z-index: 100;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #debug {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            font-size: 10px;
+            color: #555;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="info-bar">TIME: <span id="time-display">0.0</span>s</div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer">
+        <h1 id="game-title">迷宮逃脫</h1>
+        <p id="ui-message">...</p>
+        <button id="start-btn">...</button>
+    </div>
+
+    <div id="game-container">
+        <canvas id="mazeCanvas"></canvas>
+        <div id="debug"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        //        🚀 遊戲核心邏輯
+        // ==========================================
+
+        // --- 1. 設定檔讀取 ---
+        let currentConfig;
+        
+        // 預設設定
+        const DEFAULT_CONFIG = {
+            scale: { player: 0.7, goal: 0.8 },
+            physics: { cellSize: 50, ballRadiusRatio: 0.35, friction: 0.94, acceleration: 0.6, maxSpeed: 12, keyboardForce: 1.5 },
+            assets: { gameBg: "", startScreenBg: "", endScreenBg: "", player: "", goal: "" },
+            style: { wallColor: "#7f8c8d", wallGlow: true, wallThickness: 4, playerColor: "#e74c3c", goalColor: "#2ecc71" },
+            text: { gameTitle: "迷宮逃脫", startMessage: "...", startButton: "開始", winMessage: "勝利！", nextLevelButton: "重試" },
+            // 預設文字樣式
+            textStyle: {
+                title: { color: "#f1c40f", size: "2.5rem", shadow: "0 0 10px rgba(241, 196, 15, 0.5)" },
+                message: { color: "#bdc3c7", size: "1.1rem", shadow: "1px 1px 2px rgba(0,0,0,0.8)" },
+                button: { color: "#ffffff", size: "1.3rem", shadow: "0 5px 15px rgba(192, 57, 43, 0.4)" }
+            }
+        };
+
+        if (typeof window.GAME_CONFIG !== 'undefined') {
+            currentConfig = window.GAME_CONFIG;
+            // 防呆：如果舊的 config 缺少某些欄位
+            if (!currentConfig.scale) currentConfig.scale = DEFAULT_CONFIG.scale;
+            if (!currentConfig.textStyle) currentConfig.textStyle = DEFAULT_CONFIG.textStyle;
+        } else {
+            console.warn("⚠️ 警告：無法讀取 game_config.js。使用預設模式。");
+            currentConfig = DEFAULT_CONFIG;
+        }
+
+        const THEME = currentConfig.assets;
+        Object.assign(THEME, currentConfig.style);
+        Object.assign(THEME, currentConfig.text);
+        const CONFIG = currentConfig.physics;
+        const SCALE = currentConfig.scale;
+        const TEXT_STYLE = currentConfig.textStyle;
+
+        // --- 2. 應用設定到介面 ---
+        
+        // 內容
+        document.title = THEME.gameTitle;
+        const titleEl = document.getElementById('game-title');
+        const msgEl = document.getElementById('ui-message');
+        const btnEl = document.getElementById('start-btn');
+
+        titleEl.innerText = THEME.gameTitle;
+        msgEl.innerHTML = THEME.startMessage;
+        btnEl.innerText = THEME.startButton;
+
+        // 套用文字樣式 (新功能)
+        function applyStyle(element, styleObj, isButton = false) {
+            if (!element || !styleObj) return;
+            if (styleObj.color) element.style.color = styleObj.color;
+            if (styleObj.size) element.style.fontSize = styleObj.size;
+            
+            if (styleObj.shadow) {
+                if (isButton) {
+                    element.style.boxShadow = styleObj.shadow; // 按鈕用 box-shadow
+                } else {
+                    element.style.textShadow = styleObj.shadow; // 文字用 text-shadow
+                }
+            }
+        }
+
+        applyStyle(titleEl, TEXT_STYLE.title);
+        applyStyle(msgEl, TEXT_STYLE.message);
+        applyStyle(btnEl, TEXT_STYLE.button, true);
+
+
+        // --- 變數宣告 ---
+        const canvas = document.getElementById('mazeCanvas');
+        const ctx = canvas.getContext('2d');
+        const uiLayer = document.getElementById('ui-layer');
+        const timeDisplay = document.getElementById('time-display');
+
+        let mazeState = {};
+        let cols, rows;
+        let ball = { x: 0, y: 0, vx: 0, vy: 0, radius: 0 };
+        let goal = { col: 0, row: 0 };
+        let animationId;
+        let lastTime = 0;
+        let timer = 0;
+        let isPlaying = false;
+        let input = { x: 0, y: 0 };
+
+        // --- 圖片載入系統 ---
+        const sprites = {
+            bg: new Image(), 
+            startBg: new Image(),
+            endBg: new Image(),
+            player: new Image(),
+            goal: new Image()
+        };
+        let assetsLoaded = { bg: false, startBg: false, endBg: false, player: false, goal: false };
+
+        function loadAssets() {
+            if (THEME.gameBg) {
+                document.body.style.backgroundImage = `url('${THEME.gameBg}')`;
+            }
+
+            if (THEME.startScreenBg) {
+                sprites.startBg.src = THEME.startScreenBg;
+                sprites.startBg.onload = () => {
+                    assetsLoaded.startBg = true;
+                    if(!isPlaying && !uiLayer.classList.contains('hidden')) {
+                        uiLayer.style.backgroundImage = `url('${THEME.startScreenBg}')`;
+                    }
+                };
+            }
+
+            if (THEME.endScreenBg) {
+                sprites.endBg.src = THEME.endScreenBg;
+                sprites.endBg.onload = () => assetsLoaded.endBg = true;
+            }
+
+            if (THEME.player) {
+                sprites.player.src = THEME.player;
+                sprites.player.onload = () => assetsLoaded.player = true;
+            }
+            if (THEME.goal) {
+                sprites.goal.src = THEME.goal;
+                sprites.goal.onload = () => assetsLoaded.goal = true;
+            }
+        }
+
+        // --- 初始化 ---
+        function initGame() {
+            resizeCanvas();
+            uiLayer.style.backgroundImage = "none";
+            uiLayer.style.backgroundColor = "transparent";
+
+            const mazePadding = 25; 
+            const availableWidth = canvas.width - (mazePadding * 2);
+            const availableHeight = canvas.height - (mazePadding * 2);
+
+            cols = Math.floor(availableWidth / CONFIG.cellSize);
+            rows = Math.floor(availableHeight / CONFIG.cellSize);
+            
+            if (cols < 3) cols = 3;
+            if (rows < 3) rows = 3;
+
+            const effectiveCellWidth = availableWidth / cols;
+            const effectiveCellHeight = availableHeight / rows;
+            const finalSize = Math.min(effectiveCellWidth, effectiveCellHeight);
+            
+            const offsetX = (canvas.width - cols * finalSize) / 2;
+            const offsetY = (canvas.height - rows * finalSize) / 2;
+
+            mazeState = {
+                cols: cols,
+                rows: rows,
+                cellSize: finalSize,
+                offsetX: offsetX,
+                offsetY: offsetY,
+                grid: []
+            };
+
+            generateMaze();
+            spawnBallAndGoal();
+            
+            timer = 0;
+            ball.vx = 0;
+            ball.vy = 0;
+            isPlaying = true;
+            lastTime = performance.now();
+            
+            if (animationId) cancelAnimationFrame(animationId);
+            gameLoop(lastTime);
+        }
+
+        // --- 迷宮生成 ---
+        function generateMaze() {
+            mazeState.grid = [];
+            for (let r = 0; r < rows; r++) {
+                let row = [];
+                for (let c = 0; c < cols; c++) {
+                    row.push({
+                        c: c, r: r, visited: false,
+                        walls: { top: true, right: true, bottom: true, left: true }
+                    });
+                }
+                mazeState.grid.push(row);
+            }
+
+            let stack = [];
+            let current = mazeState.grid[0][0];
+            current.visited = true;
+            stack.push(current);
+
+            while (stack.length > 0) {
+                let next = checkNeighbors(current);
+                if (next) {
+                    next.visited = true;
+                    stack.push(current);
+                    removeWalls(current, next);
+                    current = next;
+                } else {
+                    current = stack.pop();
+                }
+            }
+        }
+
+        function checkNeighbors(cell) {
+            let neighbors = [];
+            let top = (cell.r > 0) ? mazeState.grid[cell.r - 1][cell.c] : undefined;
+            let right = (cell.c < cols - 1) ? mazeState.grid[cell.r][cell.c + 1] : undefined;
+            let bottom = (cell.r < rows - 1) ? mazeState.grid[cell.r + 1][cell.c] : undefined;
+            let left = (cell.c > 0) ? mazeState.grid[cell.r][cell.c - 1] : undefined;
+
+            if (top && !top.visited) neighbors.push(top);
+            if (right && !right.visited) neighbors.push(right);
+            if (bottom && !bottom.visited) neighbors.push(bottom);
+            if (left && !left.visited) neighbors.push(left);
+
+            if (neighbors.length > 0) {
+                return neighbors[Math.floor(Math.random() * neighbors.length)];
+            }
+            return undefined;
+        }
+
+        function removeWalls(a, b) {
+            let x = a.c - b.c;
+            if (x === 1) { a.walls.left = false; b.walls.right = false; }
+            else if (x === -1) { a.walls.right = false; b.walls.left = false; }
+            let y = a.r - b.r;
+            if (y === 1) { a.walls.top = false; b.walls.bottom = false; }
+            else if (y === -1) { a.walls.bottom = false; b.walls.top = false; }
+        }
+
+        // --- 實體生成 ---
+        function spawnBallAndGoal() {
+            let size = mazeState.cellSize;
+            ball.radius = size * CONFIG.ballRadiusRatio;
+            ball.x = mazeState.offsetX + size * 0.5;
+            ball.y = mazeState.offsetY + size * 0.5;
+            
+            goal.col = cols - 1;
+            goal.row = rows - 1;
+        }
+
+        // --- 物理更新 ---
+        function update(dt) {
+            if (!isPlaying) return;
+            timer += dt / 1000;
+            timeDisplay.innerText = timer.toFixed(1);
+
+            ball.vx += input.x * CONFIG.acceleration;
+            ball.vy += input.y * CONFIG.acceleration;
+            ball.vx *= CONFIG.friction;
+            ball.vy *= CONFIG.friction;
+
+            const speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
+            if (speed > CONFIG.maxSpeed) {
+                const ratio = CONFIG.maxSpeed / speed;
+                ball.vx *= ratio;
+                ball.vy *= ratio;
+            }
+
+            let nextX = ball.x + ball.vx;
+            let nextY = ball.y + ball.vy;
+            let size = mazeState.cellSize;
+            let ox = mazeState.offsetX;
+            let oy = mazeState.offsetY;
+
+            let currentC = Math.floor((ball.x - ox) / size);
+            let currentR = Math.floor((ball.y - oy) / size);
+            
+            currentC = Math.max(0, Math.min(cols - 1, currentC));
+            currentR = Math.max(0, Math.min(rows - 1, currentR));
+
+            let cell = mazeState.grid[currentR][currentC];
+
+            if (cell.walls.left && nextX - ball.radius < ox + currentC * size) {
+                nextX = ox + currentC * size + ball.radius;
+                ball.vx = -ball.vx * 0.4;
+            } else if (cell.walls.right && nextX + ball.radius > ox + (currentC + 1) * size) {
+                nextX = ox + (currentC + 1) * size - ball.radius;
+                ball.vx = -ball.vx * 0.4;
+            }
+            ball.x = nextX;
+
+            if (cell.walls.top && nextY - ball.radius < oy + currentR * size) {
+                nextY = oy + currentR * size + ball.radius;
+                ball.vy = -ball.vy * 0.4;
+            } else if (cell.walls.bottom && nextY + ball.radius > oy + (currentR + 1) * size) {
+                nextY = oy + (currentR + 1) * size - ball.radius;
+                ball.vy = -ball.vy * 0.4;
+            }
+            ball.y = nextY;
+
+            let goalX = ox + goal.col * size + size * 0.5;
+            let goalY = oy + goal.row * size + size * 0.5;
+            let dist = Math.sqrt((ball.x - goalX)**2 + (ball.y - goalY)**2);
+
+            if (dist < size * 0.4) {
+                winLevel();
+            }
+        }
+
+        function winLevel() {
+            isPlaying = false;
+            let msg = THEME.winMessage.replace('{time}', timer.toFixed(2));
+            msgEl.innerHTML = msg;
+            btnEl.innerText = THEME.nextLevelButton;
+            uiLayer.classList.remove('hidden');
+
+            // 遊戲結束時，加上半透明黑色底圖，覆蓋全螢幕
+            uiLayer.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
+
+            if (assetsLoaded.endBg) {
+                uiLayer.style.backgroundImage = `url('${THEME.endScreenBg}')`;
+            }
+        }
+
+        // --- 繪圖 ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let size = mazeState.cellSize;
+            let ox = mazeState.offsetX;
+            let oy = mazeState.offsetY;
+            let goalX = ox + goal.col * size + size * 0.5;
+            let goalY = oy + goal.row * size + size * 0.5;
+
+            // 1. 繪製終點
+            if (assetsLoaded.goal) {
+                let goalSize = size * SCALE.goal;
+                ctx.drawImage(sprites.goal, goalX - goalSize/2, goalY - goalSize/2, goalSize, goalSize);
+            } else {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = THEME.goalColor;
+                
+                ctx.beginPath();
+                ctx.arc(goalX, goalY, ball.radius * 1.2, 0, Math.PI * 2);
+                ctx.fillStyle = THEME.goalColor; 
+                ctx.fill();
+                
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = "#000";
+                ctx.beginPath();
+                ctx.arc(goalX, goalY, ball.radius * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = THEME.goalColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                for(let i=0; i<3; i++) {
+                     ctx.arc(goalX, goalY, ball.radius * (0.2 + i*0.2), 0 + timer*2, Math.PI + timer*2);
+                }
+                ctx.stroke();
+            }
+
+            // 2. 繪製牆壁
+            ctx.strokeStyle = THEME.wallColor;
+            ctx.lineWidth = THEME.wallThickness;
+            ctx.lineCap = "round";
+            
+            if (THEME.wallGlow) {
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = THEME.wallColor;
+            } else {
+                ctx.shadowBlur = 0;
+            }
+
+            ctx.beginPath();
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    let cell = mazeState.grid[r][c];
+                    let x = ox + c * size;
+                    let y = oy + r * size;
+
+                    if (cell.walls.top) { ctx.moveTo(x, y); ctx.lineTo(x + size, y); }
+                    if (cell.walls.right) { ctx.moveTo(x + size, y); ctx.lineTo(x + size, y + size); }
+                    if (cell.walls.bottom) { ctx.moveTo(x + size, y + size); ctx.lineTo(x, y + size); }
+                    if (cell.walls.left) { ctx.moveTo(x, y + size); ctx.lineTo(x, y); }
+                }
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0; 
+
+            // 3. 繪製主角
+            if (assetsLoaded.player) {
+                let pSize = size * SCALE.player; 
+                ctx.drawImage(sprites.player, ball.x - pSize/2, ball.y - pSize/2, pSize, pSize);
+            } else {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = THEME.playerColor;
+                
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                let gradient = ctx.createRadialGradient(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/10, ball.x, ball.y, ball.radius);
+                gradient.addColorStop(0, THEME.playerColor); 
+                gradient.addColorStop(1, "#c0392b");
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/4, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255,255,255,0.4)";
+                ctx.fill();
+            }
+        }
+
+        function gameLoop(time) {
+            let dt = time - lastTime;
+            lastTime = time;
+
+            update(dt);
+            draw();
+
+            if (isPlaying || !uiLayer.classList.contains('hidden')) {
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // --- 事件監聽 ---
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            const margin = 30; 
+            
+            let w = window.innerWidth - margin;
+            let h = window.innerHeight - margin;
+
+            if (w > 600) {
+                let size = Math.min(h, 600); 
+                w = size;
+                h = size;
+            } else {
+                if (h > 900) h = 900;
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            container.style.width = w + 'px';
+            container.style.height = h + 'px';
+        }
+
+        window.addEventListener('resize', () => {
+        });
+
+        function handleOrientation(event) {
+            let x = event.gamma; 
+            let y = event.beta;
+            const maxTilt = 45;
+            if (x > maxTilt) x = maxTilt; if (x < -maxTilt) x = -maxTilt;
+            if (y > maxTilt) y = maxTilt; if (y < -maxTilt) y = -maxTilt;
+            input.x = x / maxTilt;
+            input.y = y / maxTilt;
+        }
+
+        window.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp': input.y = -CONFIG.keyboardForce; break;
+                case 'ArrowDown': input.y = CONFIG.keyboardForce; break;
+                case 'ArrowLeft': input.x = -CONFIG.keyboardForce; break;
+                case 'ArrowRight': input.x = CONFIG.keyboardForce; break;
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowUp', 'ArrowDown'].includes(e.key)) input.y = 0;
+            if (['ArrowLeft', 'ArrowRight'].includes(e.key)) input.x = 0;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isPlaying) return;
+            const rect = canvas.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const sensitivity = 0.8; 
+            let x = (mouseX - centerX) / (centerX * sensitivity);
+            let y = (mouseY - centerY) / (centerY * sensitivity);
+            input.x = Math.max(-1, Math.min(1, x));
+            input.y = Math.max(-1, Math.min(1, y));
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            input.x = 0; input.y = 0;
+        });
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                try {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        startGameFlow();
+                    } else {
+                        alert("請允許感測器權限以體驗完整遊戲。");
+                        startGameFlow();
+                    }
+                } catch (error) {
+                    startGameFlow(); 
+                }
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                startGameFlow();
+            }
+        });
+
+        function startGameFlow() {
+            uiLayer.classList.add('hidden');
+            uiLayer.style.backgroundImage = "none";
+            uiLayer.style.backgroundColor = "transparent";
+            initGame();
+        }
+
+        loadAssets(); 
+        resizeCanvas();
+
+    </script>
+</body>
+</html>
