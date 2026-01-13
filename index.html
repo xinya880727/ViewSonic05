@@ -44,7 +44,7 @@
             cursor: crosshair;
         }
 
-        /* UI 覆蓋層 - 全螢幕 */
+        /* UI 覆蓋層 */
         #ui-layer {
             position: fixed;
             top: 0;
@@ -55,15 +55,13 @@
             background-size: cover;
             background-position: center;
             
-            /* 預設 Flex 佈局 */
+            /* 使用 Flexbox 將內容置中 */
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 20px; 
             
             z-index: 999;
-            padding: 0;
+            padding: 0; 
             transition: background-color 0.5s ease, opacity 0.3s ease;
             pointer-events: auto;
         }
@@ -73,34 +71,64 @@
             pointer-events: none;
         }
 
-        h1, p, button {
-            position: relative;
-            margin: 0;
-            text-align: center;
-            white-space: nowrap;
+        /* [關鍵修改] 內容容器：透明且響應式縮放 */
+        #menu-container {
+            display: flex;
+            flex-direction: column; 
+            align-items: center;    
+            justify-content: center;
+            
+            /* 使用 vh (視窗高度) 控制間距，讓它在矮螢幕(橫向手機)時自動縮小間距 */
+            gap: clamp(10px, 3vh, 30px);
+            
+            /* [RWD 設定] */
+            /* 預設佔寬度 85% (手機時會自動內縮，不佔滿) */
+            width: 85%;
+            /* 最大寬度限制，避免電腦版太寬 */
+            max-width: 500px;
+            
+            padding: 20px;
+            
+            /* [透明背景設定] */
+            background: transparent; 
+            box-shadow: none;
+            backdrop-filter: none;
         }
 
         h1 {
-            font-size: 2.5rem;
+            /* [RWD 字體] clamp(最小值, 視窗寬度比例, 最大值) */
+            font-size: clamp(2.5rem, 10vw, 4rem);
             color: #f1c40f;
             text-transform: uppercase;
             letter-spacing: 3px;
             text-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
+            margin: 0;
+            text-align: center;
+            white-space: nowrap; 
         }
 
         p {
-            font-size: 1.1rem;
+            /* [RWD 字體] 手機 1rem ~ 電腦 1.3rem */
+            font-size: clamp(1rem, 4vw, 1.3rem);
             line-height: 1.6;
             color: #bdc3c7;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            margin: 0;
+            text-align: center;
+            white-space: normal;
+            word-wrap: break-word;
+            width: 100%;
         }
 
         button {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             color: white;
             border: none;
-            padding: 15px 40px;
-            font-size: 1.3rem;
+            
+            /* [RWD 按鈕尺寸] */
+            padding: clamp(10px, 2vh, 15px) clamp(30px, 5vw, 50px);
+            font-size: clamp(1.1rem, 4vw, 1.5rem);
+            
             border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
@@ -108,20 +136,18 @@
             font-weight: bold;
             letter-spacing: 1px;
             text-transform: uppercase;
+            white-space: nowrap;
+            margin: 0;
         }
 
         button:hover {
-            transform: translateX(-50%) translateY(-2px);
+            transform: translateY(-2px);
             filter: brightness(1.1);
         }
 
         button:active {
-            transform: translateX(-50%) translateY(2px);
+            transform: translateY(2px);
             filter: brightness(0.9);
-        }
-
-        button:not([style*="absolute"]):hover {
-             transform: translateY(-2px);
         }
 
         #info-bar {
@@ -139,36 +165,33 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        /* 除錯資訊 */
-        #debug-info {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            color: lime;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.5);
-            padding: 5px;
+        #debug {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            font-size: 10px;
+            color: #555;
             pointer-events: none;
-            white-space: pre;
         }
     </style>
 </head>
 <body>
 
     <div id="info-bar">TIME: <span id="time-display">0.0</span>s</div>
-    <div id="debug-info">Waiting for sensor...</div>
 
     <!-- UI Layer -->
     <div id="ui-layer">
-        <h1 id="game-title">迷宮逃脫</h1>
-        <p id="ui-message">...</p>
-        <button id="start-btn">...</button>
+        <!-- 容器：防止跑版 -->
+        <div id="menu-container">
+            <h1 id="game-title">迷宮逃脫</h1>
+            <p id="ui-message">...</p>
+            <button id="start-btn">...</button>
+        </div>
     </div>
 
     <div id="game-container">
         <canvas id="mazeCanvas"></canvas>
+        <div id="debug"></div>
     </div>
 
     <script>
@@ -178,24 +201,23 @@
 
         // --- 1. 設定檔讀取 ---
         let currentConfig;
-        
         const DEFAULT_CONFIG = {
             scale: { player: 0.7, goal: 0.8 },
-            physics: { cellSize: 50, ballRadiusRatio: 0.35, friction: 0.94, acceleration: 0.6, maxSpeed: 12, keyboardForce: 1.5 },
+            physics: { cellSize: 60, ballRadiusRatio: 0.35, friction: 0.94, acceleration: 0.6, maxSpeed: 6, keyboardForce: 1.5 },
             assets: { gameBg: "", startScreenBg: "", endScreenBg: "", player: "", goal: "" },
             style: { wallColor: "#7f8c8d", wallGlow: true, wallThickness: 4, playerColor: "#e74c3c", goalColor: "#2ecc71" },
             text: { gameTitle: "迷宮逃脫", winTitle: "逃脫成功！", startMessage: "...", startButton: "開始", winMessage: "勝利！", nextLevelButton: "重試" },
             textStyle: {
-                title: { color: "#f1c40f", size: "2.5rem", shadow: "0 0 10px rgba(241, 196, 15, 0.5)", position: { top: "15%", left: "50%" } },
-                winTitle: { color: "#2ecc71", size: "3rem", shadow: "0 0 20px rgba(46, 204, 113, 0.8)", position: { top: "20%", left: "50%" } },
-                message: { color: "#bdc3c7", size: "1.1rem", shadow: "1px 1px 2px rgba(0,0,0,0.8)", position: { top: "40%", left: "50%" } },
-                winMessage: { color: "#ffffff", size: "1.5rem", shadow: "0 0 10px rgba(255, 255, 255, 0.8)", position: { top: "45%", left: "50%" } },
+                // 使用 clamp 設定預設值，確保即使沒有 config 也能 RWD
+                title: { color: "#f1c40f", size: "clamp(2.5rem, 10vw, 4rem)", shadow: "0 0 10px rgba(241, 196, 15, 0.5)" },
+                winTitle: { color: "#2ecc71", size: "clamp(2.5rem, 10vw, 4rem)", shadow: "0 0 20px rgba(46, 204, 113, 0.8)" },
+                message: { color: "#bdc3c7", size: "clamp(1rem, 4vw, 1.3rem)", shadow: "1px 1px 2px rgba(0,0,0,0.8)" },
+                winMessage: { color: "#ffffff", size: "clamp(1rem, 4vw, 1.3rem)", shadow: "0 0 10px rgba(255, 255, 255, 0.8)" },
                 button: { 
                     color: "#ffffff", 
                     bgColor: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
-                    size: "1.3rem", 
-                    shadow: "0 5px 15px rgba(192, 57, 43, 0.4)",
-                    position: { bottom: "20%", left: "50%" }
+                    size: "clamp(1.1rem, 4vw, 1.5rem)", 
+                    shadow: "0 5px 15px rgba(192, 57, 43, 0.4)" 
                 }
             }
         };
@@ -205,14 +227,10 @@
             if (!currentConfig.textStyle) currentConfig.textStyle = JSON.parse(JSON.stringify(DEFAULT_CONFIG.textStyle));
             if (!currentConfig.text.winTitle) currentConfig.text.winTitle = DEFAULT_CONFIG.text.winTitle;
             ['title', 'winTitle', 'message', 'winMessage', 'button'].forEach(key => {
-                if (!currentConfig.textStyle[key]) {
-                    currentConfig.textStyle[key] = DEFAULT_CONFIG.textStyle[key];
-                } else if (!currentConfig.textStyle[key].position) {
-                    currentConfig.textStyle[key].position = DEFAULT_CONFIG.textStyle[key].position;
-                }
+                if (!currentConfig.textStyle[key]) currentConfig.textStyle[key] = DEFAULT_CONFIG.textStyle[key];
             });
         } else {
-            console.warn("⚠️ 警告：無法讀取 game_config.js。使用預設模式。");
+            console.warn("Using Default Config");
             currentConfig = DEFAULT_CONFIG;
         }
 
@@ -228,7 +246,6 @@
         const titleEl = document.getElementById('game-title');
         const msgEl = document.getElementById('ui-message');
         const btnEl = document.getElementById('start-btn');
-        const debugInfo = document.getElementById('debug-info');
 
         function resetStartScreen() {
             titleEl.innerText = THEME.gameTitle;
@@ -248,23 +265,13 @@
                 if (isButton) element.style.boxShadow = styleObj.shadow;
                 else element.style.textShadow = styleObj.shadow;
             }
-
+            // 移除絕對定位，強制使用 Flex 容器排版
             element.style.position = ""; 
             element.style.top = "";
             element.style.bottom = "";
             element.style.left = "";
             element.style.right = "";
             element.style.transform = "";
-
-            if (styleObj.position) {
-                element.style.position = "absolute"; 
-                const pos = styleObj.position;
-                if (pos.top !== undefined) element.style.top = pos.top;
-                if (pos.bottom !== undefined) element.style.bottom = pos.bottom;
-                if (pos.left !== undefined) element.style.left = pos.left;
-                if (pos.right !== undefined) element.style.right = pos.right;
-                if (pos.left === "50%") element.style.transform = "translateX(-50%)";
-            }
         }
 
         resetStartScreen();
@@ -317,8 +324,18 @@
             const availableWidth = canvas.width - (mazePadding * 2);
             const availableHeight = canvas.height - (mazePadding * 2);
 
-            cols = Math.floor(availableWidth / CONFIG.cellSize);
-            rows = Math.floor(availableHeight / CONFIG.cellSize);
+            let adaptiveCellSize = CONFIG.cellSize;
+            const minColsForMobile = 9; 
+            const calculatedCols = Math.floor(availableWidth / adaptiveCellSize);
+
+            if (calculatedCols < minColsForMobile) {
+                adaptiveCellSize = Math.floor(availableWidth / minColsForMobile);
+                adaptiveCellSize = Math.max(30, adaptiveCellSize); 
+            }
+
+            cols = Math.floor(availableWidth / adaptiveCellSize);
+            rows = Math.floor(availableHeight / adaptiveCellSize);
+            
             if (cols < 3) cols = 3;
             if (rows < 3) rows = 3;
 
@@ -402,13 +419,13 @@
             goal.row = rows - 1;
         }
 
-        // --- 物理更新 (即時控制版) ---
+        // --- 物理更新 ---
         function update(dt) {
             if (!isPlaying) return;
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            // 即時反應
+            // 直接速度控制 (保留您滿意的陀螺儀操作感)
             ball.vx = input.x * CONFIG.maxSpeed;
             ball.vy = input.y * CONFIG.maxSpeed;
 
@@ -421,7 +438,6 @@
             let currentC = Math.floor((ball.x - ox) / size);
             let currentR = Math.floor((ball.y - oy) / size);
             
-            // 邊界保護
             currentC = Math.max(0, Math.min(cols - 1, currentC));
             currentR = Math.max(0, Math.min(rows - 1, currentR));
 
@@ -532,45 +548,22 @@
 
         window.addEventListener('resize', () => {});
 
-        // 核心修正：陀螺儀方向處理
+        // 簡單陀螺儀邏輯 (保留您原始版本)
         function handleOrientation(event) {
-            const beta = event.beta;   // 前後 (直式) / 左右 (橫式)
-            const gamma = event.gamma; // 左右 (直式) / 前後 (橫式)
+            let x = event.gamma; 
+            let y = event.beta;
             
-            if (beta === null || gamma === null) return;
+            if (x === null || y === null) return;
 
-            // 使用視窗長寬比判斷：寬 > 高 視為橫式 (Landscape)
-            const isLandscape = window.innerWidth > window.innerHeight;
+            const maxTilt = 30; 
             
-            debugInfo.innerText = `${isLandscape ? 'Landscape' : 'Portrait'}\nB:${beta?.toFixed(1)} G:${gamma?.toFixed(1)}`;
-
-            let inputX = 0;
-            let inputY = 0;
-
-            if (isLandscape) {
-                // 橫式模式 (平板常見)
-                // 左右傾斜 (Beta) 控制 X 軸
-                // 前後傾斜 (Gamma) 控制 Y 軸
-                // 注意：Gamma 在裝置左側抬起時為負，所以需要反轉或對應
-                inputX = beta; 
-                inputY = -gamma; 
-            } else {
-                // 直式模式 (手機常見)
-                // 左右傾斜 (Gamma) 控制 X 軸
-                // 前後傾斜 (Beta) 控制 Y 軸
-                inputX = gamma;
-                inputY = beta;
-            }
-
-            const maxTilt = 20; // 20度即達全速
+            if (x > maxTilt) x = maxTilt; 
+            if (x < -maxTilt) x = -maxTilt;
+            if (y > maxTilt) y = maxTilt; 
+            if (y < -maxTilt) y = -maxTilt;
             
-            // 限制範圍
-            inputX = Math.max(-maxTilt, Math.min(maxTilt, inputX));
-            inputY = Math.max(-maxTilt, Math.min(maxTilt, inputY));
-            
-            // 應用速度
-            input.x = inputX / maxTilt;
-            input.y = inputY / maxTilt;
+            input.x = x / maxTilt;
+            input.y = y / maxTilt;
         }
 
         window.addEventListener('keydown', (e) => {
