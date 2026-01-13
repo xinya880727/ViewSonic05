@@ -461,23 +461,24 @@
             goal.row = rows - 1;
         }
 
-        // --- 物理更新 ---
+        // --- 物理更新 (修改：從加速度改為直接速度控制) ---
         function update(dt) {
             if (!isPlaying) return;
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            ball.vx += input.x * CONFIG.acceleration;
-            ball.vy += input.y * CONFIG.acceleration;
-            ball.vx *= CONFIG.friction;
-            ball.vy *= CONFIG.friction;
+            // [修改重點] 讓角色速度直接反應傾斜度，不再累加加速度
+            // 這會解決 "感覺像在冰上滑" 或 "沒辦法即時停下" 的問題
+            
+            // 1. 計算目標速度 (傾斜越多，速度越快)
+            const targetVx = input.x * CONFIG.maxSpeed;
+            const targetVy = input.y * CONFIG.maxSpeed;
 
-            const speed = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
-            if (speed > CONFIG.maxSpeed) {
-                const ratio = CONFIG.maxSpeed / speed;
-                ball.vx *= ratio;
-                ball.vy *= ratio;
-            }
+            // 2. 使用平滑移動 (Lerp)，係數 0.2 代表反應很靈敏 (數值越大越快)
+            ball.vx += (targetVx - ball.vx) * 0.2;
+            ball.vy += (targetVy - ball.vy) * 0.2;
+
+            // 注意：我們移除了 friction 乘法，因為現在速度是直接控制的
 
             let nextX = ball.x + ball.vx;
             let nextY = ball.y + ball.vy;
@@ -495,7 +496,7 @@
 
             if (cell.walls.left && nextX - ball.radius < ox + currentC * size) {
                 nextX = ox + currentC * size + ball.radius;
-                ball.vx = -ball.vx * 0.4;
+                ball.vx = -ball.vx * 0.4; // 撞牆反彈減速
             } else if (cell.walls.right && nextX + ball.radius > ox + (currentC + 1) * size) {
                 nextX = ox + (currentC + 1) * size - ball.radius;
                 ball.vx = -ball.vx * 0.4;
@@ -711,7 +712,8 @@
                 inputY = y;
             }
 
-            const maxTilt = 45;
+            // 修改：降低判定閾值，讓操控更靈敏
+            const maxTilt = 30; // 只要傾斜 30 度就能達到最大速度
             
             if (inputX > maxTilt) inputX = maxTilt; 
             if (inputX < -maxTilt) inputX = -maxTilt;
