@@ -55,12 +55,12 @@
             background-size: cover;
             background-position: center;
             
-            /* 修正：恢復 flex 佈局作為預設值，以防某些元素沒有設定絕對定位時會跑版 */
+            /* 預設 Flex 佈局，防止跑版 */
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 20px; /* 增加間距，讓沒有定位的元素不會黏在一起 */
+            gap: 20px; 
             
             z-index: 999;
             padding: 0;
@@ -73,12 +73,11 @@
             pointer-events: none;
         }
 
-        /* 預設樣式，會被 JS 設定覆蓋 */
         h1, p, button {
             position: relative;
             margin: 0;
             text-align: center;
-            white-space: nowrap; /* 防止文字換行影響定位 */
+            white-space: nowrap;
         }
 
         h1 {
@@ -112,7 +111,7 @@
         }
 
         button:hover {
-            transform: translateX(-50%) translateY(-2px); /* 假設有置中，若無則 JS 會覆寫 */
+            transform: translateX(-50%) translateY(-2px);
             filter: brightness(1.1);
         }
 
@@ -121,7 +120,6 @@
             filter: brightness(0.9);
         }
 
-        /* 簡單的按鈕 hover 修正，針對未定位的情況 */
         button:not([style*="absolute"]):hover {
              transform: translateY(-2px);
         }
@@ -141,19 +139,26 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
 
-        #debug {
-            position: absolute;
-            bottom: 5px;
-            left: 5px;
-            font-size: 10px;
-            color: #555;
+        /* 新增：陀螺儀數值顯示，方便除錯 */
+        #debug-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            color: lime;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.5);
+            padding: 5px;
             pointer-events: none;
+            white-space: pre;
         }
     </style>
 </head>
 <body>
 
     <div id="info-bar">TIME: <span id="time-display">0.0</span>s</div>
+    <div id="debug-info">Waiting for sensor...</div>
 
     <!-- UI Layer -->
     <div id="ui-layer">
@@ -164,7 +169,6 @@
 
     <div id="game-container">
         <canvas id="mazeCanvas"></canvas>
-        <div id="debug"></div>
     </div>
 
     <script>
@@ -200,15 +204,8 @@
 
         if (typeof window.GAME_CONFIG !== 'undefined') {
             currentConfig = window.GAME_CONFIG;
-            
-            // --- 防呆機制補強 ---
-            // 確保 textStyle 結構存在
             if (!currentConfig.textStyle) currentConfig.textStyle = JSON.parse(JSON.stringify(DEFAULT_CONFIG.textStyle));
-
-            // 確保必要的文字欄位存在
             if (!currentConfig.text.winTitle) currentConfig.text.winTitle = DEFAULT_CONFIG.text.winTitle;
-
-            // 檢查每個元件的 position，如果缺失則補上預設值
             ['title', 'winTitle', 'message', 'winMessage', 'button'].forEach(key => {
                 if (!currentConfig.textStyle[key]) {
                     currentConfig.textStyle[key] = DEFAULT_CONFIG.textStyle[key];
@@ -216,7 +213,6 @@
                     currentConfig.textStyle[key].position = DEFAULT_CONFIG.textStyle[key].position;
                 }
             });
-
         } else {
             console.warn("⚠️ 警告：無法讀取 game_config.js。使用預設模式。");
             currentConfig = DEFAULT_CONFIG;
@@ -234,36 +230,27 @@
         const titleEl = document.getElementById('game-title');
         const msgEl = document.getElementById('ui-message');
         const btnEl = document.getElementById('start-btn');
+        const debugInfo = document.getElementById('debug-info');
 
-        // 初始化開始畫面
         function resetStartScreen() {
             titleEl.innerText = THEME.gameTitle;
             msgEl.innerHTML = THEME.startMessage;
             btnEl.innerText = THEME.startButton;
-            
             applyStyle(titleEl, TEXT_STYLE.title);
             applyStyle(msgEl, TEXT_STYLE.message);
             applyStyle(btnEl, TEXT_STYLE.button, true);
         }
 
-        // 套用樣式與位置
         function applyStyle(element, styleObj, isButton = false) {
             if (!element || !styleObj) return;
-            
-            // 外觀
             if (styleObj.color) element.style.color = styleObj.color;
             if (styleObj.size) element.style.fontSize = styleObj.size;
             if (styleObj.bgColor) element.style.background = styleObj.bgColor;
-            
             if (styleObj.shadow) {
-                if (isButton) {
-                    element.style.boxShadow = styleObj.shadow;
-                } else {
-                    element.style.textShadow = styleObj.shadow;
-                }
+                if (isButton) element.style.boxShadow = styleObj.shadow;
+                else element.style.textShadow = styleObj.shadow;
             }
 
-            // 位置 (Position)
             element.style.position = ""; 
             element.style.top = "";
             element.style.bottom = "";
@@ -274,21 +261,15 @@
             if (styleObj.position) {
                 element.style.position = "absolute"; 
                 const pos = styleObj.position;
-                
                 if (pos.top !== undefined) element.style.top = pos.top;
                 if (pos.bottom !== undefined) element.style.bottom = pos.bottom;
                 if (pos.left !== undefined) element.style.left = pos.left;
                 if (pos.right !== undefined) element.style.right = pos.right;
-
-                if (pos.left === "50%") {
-                    element.style.transform = "translateX(-50%)";
-                }
+                if (pos.left === "50%") element.style.transform = "translateX(-50%)";
             }
         }
 
-        // 執行初始化
         resetStartScreen();
-
 
         // --- 變數宣告 ---
         const canvas = document.getElementById('mazeCanvas');
@@ -308,19 +289,12 @@
 
         // --- 圖片載入系統 ---
         const sprites = {
-            bg: new Image(), 
-            startBg: new Image(),
-            endBg: new Image(),
-            player: new Image(),
-            goal: new Image()
+            bg: new Image(), startBg: new Image(), endBg: new Image(), player: new Image(), goal: new Image()
         };
         let assetsLoaded = { bg: false, startBg: false, endBg: false, player: false, goal: false };
 
         function loadAssets() {
-            if (THEME.gameBg) {
-                document.body.style.backgroundImage = `url('${THEME.gameBg}')`;
-            }
-
+            if (THEME.gameBg) document.body.style.backgroundImage = `url('${THEME.gameBg}')`;
             if (THEME.startScreenBg) {
                 sprites.startBg.src = THEME.startScreenBg;
                 sprites.startBg.onload = () => {
@@ -330,20 +304,9 @@
                     }
                 };
             }
-
-            if (THEME.endScreenBg) {
-                sprites.endBg.src = THEME.endScreenBg;
-                sprites.endBg.onload = () => assetsLoaded.endBg = true;
-            }
-
-            if (THEME.player) {
-                sprites.player.src = THEME.player;
-                sprites.player.onload = () => assetsLoaded.player = true;
-            }
-            if (THEME.goal) {
-                sprites.goal.src = THEME.goal;
-                sprites.goal.onload = () => assetsLoaded.goal = true;
-            }
+            if (THEME.endScreenBg) { sprites.endBg.src = THEME.endScreenBg; sprites.endBg.onload = () => assetsLoaded.endBg = true; }
+            if (THEME.player) { sprites.player.src = THEME.player; sprites.player.onload = () => assetsLoaded.player = true; }
+            if (THEME.goal) { sprites.goal.src = THEME.goal; sprites.goal.onload = () => assetsLoaded.goal = true; }
         }
 
         // --- 初始化 ---
@@ -358,7 +321,6 @@
 
             cols = Math.floor(availableWidth / CONFIG.cellSize);
             rows = Math.floor(availableHeight / CONFIG.cellSize);
-            
             if (cols < 3) cols = 3;
             if (rows < 3) rows = 3;
 
@@ -370,12 +332,7 @@
             const offsetY = (canvas.height - rows * finalSize) / 2;
 
             mazeState = {
-                cols: cols,
-                rows: rows,
-                cellSize: finalSize,
-                offsetX: offsetX,
-                offsetY: offsetY,
-                grid: []
+                cols: cols, rows: rows, cellSize: finalSize, offsetX: offsetX, offsetY: offsetY, grid: []
             };
 
             generateMaze();
@@ -397,26 +354,18 @@
             for (let r = 0; r < rows; r++) {
                 let row = [];
                 for (let c = 0; c < cols; c++) {
-                    row.push({
-                        c: c, r: r, visited: false,
-                        walls: { top: true, right: true, bottom: true, left: true }
-                    });
+                    row.push({ c: c, r: r, visited: false, walls: { top: true, right: true, bottom: true, left: true } });
                 }
                 mazeState.grid.push(row);
             }
-
             let stack = [];
             let current = mazeState.grid[0][0];
             current.visited = true;
             stack.push(current);
-
             while (stack.length > 0) {
                 let next = checkNeighbors(current);
                 if (next) {
-                    next.visited = true;
-                    stack.push(current);
-                    removeWalls(current, next);
-                    current = next;
+                    next.visited = true; stack.push(current); removeWalls(current, next); current = next;
                 } else {
                     current = stack.pop();
                 }
@@ -429,15 +378,11 @@
             let right = (cell.c < cols - 1) ? mazeState.grid[cell.r][cell.c + 1] : undefined;
             let bottom = (cell.r < rows - 1) ? mazeState.grid[cell.r + 1][cell.c] : undefined;
             let left = (cell.c > 0) ? mazeState.grid[cell.r][cell.c - 1] : undefined;
-
             if (top && !top.visited) neighbors.push(top);
             if (right && !right.visited) neighbors.push(right);
             if (bottom && !bottom.visited) neighbors.push(bottom);
             if (left && !left.visited) neighbors.push(left);
-
-            if (neighbors.length > 0) {
-                return neighbors[Math.floor(Math.random() * neighbors.length)];
-            }
+            if (neighbors.length > 0) return neighbors[Math.floor(Math.random() * neighbors.length)];
             return undefined;
         }
 
@@ -450,35 +395,25 @@
             else if (y === -1) { a.walls.bottom = false; b.walls.top = false; }
         }
 
-        // --- 實體生成 ---
         function spawnBallAndGoal() {
             let size = mazeState.cellSize;
             ball.radius = size * CONFIG.ballRadiusRatio;
             ball.x = mazeState.offsetX + size * 0.5;
             ball.y = mazeState.offsetY + size * 0.5;
-            
             goal.col = cols - 1;
             goal.row = rows - 1;
         }
 
-        // --- 物理更新 (修改：從加速度改為直接速度控制) ---
+        // --- 物理更新 (即時控制版) ---
         function update(dt) {
             if (!isPlaying) return;
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            // [修改重點] 讓角色速度直接反應傾斜度，不再累加加速度
-            // 這會解決 "感覺像在冰上滑" 或 "沒辦法即時停下" 的問題
-            
-            // 1. 計算目標速度 (傾斜越多，速度越快)
-            const targetVx = input.x * CONFIG.maxSpeed;
-            const targetVy = input.y * CONFIG.maxSpeed;
-
-            // 2. 使用平滑移動 (Lerp)，係數 0.2 代表反應很靈敏 (數值越大越快)
-            ball.vx += (targetVx - ball.vx) * 0.2;
-            ball.vy += (targetVy - ball.vy) * 0.2;
-
-            // 注意：我們移除了 friction 乘法，因為現在速度是直接控制的
+            // 修改：移除平滑與加速度，直接速度映射 (Instant Movement)
+            // input.x/y 範圍約為 -1 到 1
+            ball.vx = input.x * CONFIG.maxSpeed;
+            ball.vy = input.y * CONFIG.maxSpeed;
 
             let nextX = ball.x + ball.vx;
             let nextY = ball.y + ball.vy;
@@ -489,26 +424,24 @@
             let currentC = Math.floor((ball.x - ox) / size);
             let currentR = Math.floor((ball.y - oy) / size);
             
+            // 邊界保護
             currentC = Math.max(0, Math.min(cols - 1, currentC));
             currentR = Math.max(0, Math.min(rows - 1, currentR));
 
             let cell = mazeState.grid[currentR][currentC];
 
+            // 碰撞檢測 - 直接停止速度
             if (cell.walls.left && nextX - ball.radius < ox + currentC * size) {
                 nextX = ox + currentC * size + ball.radius;
-                ball.vx = -ball.vx * 0.4; // 撞牆反彈減速
             } else if (cell.walls.right && nextX + ball.radius > ox + (currentC + 1) * size) {
                 nextX = ox + (currentC + 1) * size - ball.radius;
-                ball.vx = -ball.vx * 0.4;
             }
             ball.x = nextX;
 
             if (cell.walls.top && nextY - ball.radius < oy + currentR * size) {
                 nextY = oy + currentR * size + ball.radius;
-                ball.vy = -ball.vy * 0.4;
             } else if (cell.walls.bottom && nextY + ball.radius > oy + (currentR + 1) * size) {
                 nextY = oy + (currentR + 1) * size - ball.radius;
-                ball.vy = -ball.vy * 0.4;
             }
             ball.y = nextY;
 
@@ -516,9 +449,7 @@
             let goalY = oy + goal.row * size + size * 0.5;
             let dist = Math.sqrt((ball.x - goalX)**2 + (ball.y - goalY)**2);
 
-            if (dist < size * 0.4) {
-                winLevel();
-            }
+            if (dist < size * 0.4) winLevel();
         }
 
         function winLevel() {
@@ -527,162 +458,98 @@
             msgEl.innerHTML = msg;
             btnEl.innerText = THEME.nextLevelButton;
             uiLayer.classList.remove('hidden');
-
             uiLayer.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
-
-            // 1. 修改標題文字為「勝利標題」
-            if (THEME.winTitle) {
-                titleEl.innerText = THEME.winTitle;
-            }
-            
-            // 2. 套用「勝利標題」樣式
-            if (TEXT_STYLE.winTitle) {
-                applyStyle(titleEl, TEXT_STYLE.winTitle);
-            }
-
-            // 3. 套用「勝利訊息」樣式
-            if (TEXT_STYLE.winMessage) {
-                applyStyle(msgEl, TEXT_STYLE.winMessage);
-            }
-
-            if (assetsLoaded.endBg) {
-                uiLayer.style.backgroundImage = `url('${THEME.endScreenBg}')`;
-            }
+            if (THEME.winTitle) titleEl.innerText = THEME.winTitle;
+            if (TEXT_STYLE.winTitle) applyStyle(titleEl, TEXT_STYLE.winTitle);
+            if (TEXT_STYLE.winMessage) applyStyle(msgEl, TEXT_STYLE.winMessage);
+            if (assetsLoaded.endBg) uiLayer.style.backgroundImage = `url('${THEME.endScreenBg}')`;
         }
 
-        // --- 繪圖 ---
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             let size = mazeState.cellSize;
             let ox = mazeState.offsetX;
             let oy = mazeState.offsetY;
             let goalX = ox + goal.col * size + size * 0.5;
             let goalY = oy + goal.row * size + size * 0.5;
 
-            // 1. 繪製終點
+            // Goal
             if (assetsLoaded.goal) {
                 let goalSize = size * SCALE.goal;
                 ctx.drawImage(sprites.goal, goalX - goalSize/2, goalY - goalSize/2, goalSize, goalSize);
             } else {
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = THEME.goalColor;
-                
-                ctx.beginPath();
-                ctx.arc(goalX, goalY, ball.radius * 1.2, 0, Math.PI * 2);
-                ctx.fillStyle = THEME.goalColor; 
-                ctx.fill();
-                
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = "#000";
-                ctx.beginPath();
-                ctx.arc(goalX, goalY, ball.radius * 0.8, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.strokeStyle = THEME.goalColor;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                for(let i=0; i<3; i++) {
-                     ctx.arc(goalX, goalY, ball.radius * (0.2 + i*0.2), 0 + timer*2, Math.PI + timer*2);
-                }
+                ctx.shadowBlur = 20; ctx.shadowColor = THEME.goalColor;
+                ctx.beginPath(); ctx.arc(goalX, goalY, ball.radius * 1.2, 0, Math.PI * 2); ctx.fillStyle = THEME.goalColor; ctx.fill();
+                ctx.shadowBlur = 0; ctx.fillStyle = "#000"; ctx.beginPath(); ctx.arc(goalX, goalY, ball.radius * 0.8, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = THEME.goalColor; ctx.lineWidth = 2; ctx.beginPath();
+                for(let i=0; i<3; i++) ctx.arc(goalX, goalY, ball.radius * (0.2 + i*0.2), 0 + timer*2, Math.PI + timer*2);
                 ctx.stroke();
             }
 
-            // 2. 繪製牆壁
-            ctx.strokeStyle = THEME.wallColor;
-            ctx.lineWidth = THEME.wallThickness;
-            ctx.lineCap = "round";
-            
-            if (THEME.wallGlow) {
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = THEME.wallColor;
-            } else {
-                ctx.shadowBlur = 0;
-            }
-
+            // Walls
+            ctx.strokeStyle = THEME.wallColor; ctx.lineWidth = THEME.wallThickness; ctx.lineCap = "round";
+            if (THEME.wallGlow) { ctx.shadowBlur = 10; ctx.shadowColor = THEME.wallColor; } else { ctx.shadowBlur = 0; }
             ctx.beginPath();
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     let cell = mazeState.grid[r][c];
-                    let x = ox + c * size;
-                    let y = oy + r * size;
-
+                    let x = ox + c * size; let y = oy + r * size;
                     if (cell.walls.top) { ctx.moveTo(x, y); ctx.lineTo(x + size, y); }
                     if (cell.walls.right) { ctx.moveTo(x + size, y); ctx.lineTo(x + size, y + size); }
                     if (cell.walls.bottom) { ctx.moveTo(x + size, y + size); ctx.lineTo(x, y + size); }
                     if (cell.walls.left) { ctx.moveTo(x, y + size); ctx.lineTo(x, y); }
                 }
             }
-            ctx.stroke();
-            ctx.shadowBlur = 0; 
+            ctx.stroke(); ctx.shadowBlur = 0; 
 
-            // 3. 繪製主角
+            // Player
             if (assetsLoaded.player) {
                 let pSize = size * SCALE.player; 
                 ctx.drawImage(sprites.player, ball.x - pSize/2, ball.y - pSize/2, pSize, pSize);
             } else {
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = THEME.playerColor;
-                
-                ctx.beginPath();
-                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.shadowBlur = 15; ctx.shadowColor = THEME.playerColor;
+                ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
                 let gradient = ctx.createRadialGradient(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/10, ball.x, ball.y, ball.radius);
-                gradient.addColorStop(0, THEME.playerColor); 
-                gradient.addColorStop(1, "#c0392b");
-                ctx.fillStyle = gradient;
-                ctx.fill();
-                
-                ctx.shadowBlur = 0;
-                ctx.beginPath();
-                ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/4, 0, Math.PI * 2);
-                ctx.fillStyle = "rgba(255,255,255,0.4)";
-                ctx.fill();
+                gradient.addColorStop(0, THEME.playerColor); gradient.addColorStop(1, "#c0392b");
+                ctx.fillStyle = gradient; ctx.fill();
+                ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(ball.x - ball.radius/3, ball.y - ball.radius/3, ball.radius/4, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fill();
             }
         }
 
         function gameLoop(time) {
             let dt = time - lastTime;
             lastTime = time;
-
             update(dt);
             draw();
-
             if (isPlaying || !uiLayer.classList.contains('hidden')) {
                 animationId = requestAnimationFrame(gameLoop);
             }
         }
 
-        // --- 事件監聽 ---
         function resizeCanvas() {
             const container = document.getElementById('game-container');
             const margin = 30; 
-            
-            let w = window.innerWidth - margin;
-            let h = window.innerHeight - margin;
-
-            if (w > 600) {
-                let size = Math.min(h, 600); 
-                w = size;
-                h = size;
-            } else {
-                if (h > 900) h = 900;
-            }
-
-            canvas.width = w;
-            canvas.height = h;
-            container.style.width = w + 'px';
-            container.style.height = h + 'px';
+            let w = window.innerWidth - margin; let h = window.innerHeight - margin;
+            if (w > 600) { let size = Math.min(h, 600); w = size; h = size; } 
+            else { if (h > 900) h = 900; }
+            canvas.width = w; canvas.height = h;
+            container.style.width = w + 'px'; container.style.height = h + 'px';
         }
 
-        window.addEventListener('resize', () => {
-        });
+        window.addEventListener('resize', () => {});
 
         // 修正後的陀螺儀控制 (支援橫向/平板)
         function handleOrientation(event) {
-            let x = event.gamma; // 左/右傾斜 (直向時)
-            let y = event.beta;  // 前/後傾斜 (直向時)
+            let x = event.gamma; // 左/右傾斜
+            let y = event.beta;  // 前/後傾斜
             
-            // 取得螢幕旋轉角度 (相容性處理)
+            // 簡單的除錯資訊
+            debugInfo.innerText = `Gamma(X): ${x?.toFixed(1)}\nBeta(Y): ${y?.toFixed(1)}`;
+
+            if (x === null || y === null) return;
+
+            // 取得螢幕旋轉角度
             let angle = 0;
             if (window.screen && window.screen.orientation) {
                 angle = window.screen.orientation.angle;
@@ -693,13 +560,13 @@
             let inputX = 0;
             let inputY = 0;
 
-            // 根據角度修正座標軸
+            // 根據角度修正座標軸 (解決平板/橫向問題)
             if (angle === 90) {
-                // 橫向 (Home 鍵在右 / 鏡頭在左)
+                // 橫向 (Home 鍵在右)
                 inputX = y;
                 inputY = -x;
             } else if (angle === -90 || angle === 270) {
-                // 橫向 (Home 鍵在左 / 鏡頭在右)
+                // 橫向 (Home 鍵在左)
                 inputX = -y;
                 inputY = x;
             } else if (angle === 180) {
@@ -712,8 +579,10 @@
                 inputY = y;
             }
 
-            // 修改：降低判定閾值，讓操控更靈敏
-            const maxTilt = 30; // 只要傾斜 30 度就能達到最大速度
+            debugInfo.innerText += `\nInX: ${inputX.toFixed(1)} InY: ${inputY.toFixed(1)}`;
+
+            // 調整靈敏度：只要傾斜 20 度就全速
+            const maxTilt = 20; 
             
             if (inputX > maxTilt) inputX = maxTilt; 
             if (inputX < -maxTilt) inputX = -maxTilt;
@@ -726,10 +595,10 @@
 
         window.addEventListener('keydown', (e) => {
             switch(e.key) {
-                case 'ArrowUp': input.y = -CONFIG.keyboardForce; break;
-                case 'ArrowDown': input.y = CONFIG.keyboardForce; break;
-                case 'ArrowLeft': input.x = -CONFIG.keyboardForce; break;
-                case 'ArrowRight': input.x = CONFIG.keyboardForce; break;
+                case 'ArrowUp': input.y = -1; break; // 鍵盤也改為直接速度
+                case 'ArrowDown': input.y = 1; break;
+                case 'ArrowLeft': input.x = -1; break;
+                case 'ArrowRight': input.x = 1; break;
             }
         });
         window.addEventListener('keyup', (e) => {
@@ -751,9 +620,7 @@
             input.y = Math.max(-1, Math.min(1, y));
         });
 
-        canvas.addEventListener('mouseleave', () => {
-            input.x = 0; input.y = 0;
-        });
+        canvas.addEventListener('mouseleave', () => { input.x = 0; input.y = 0; });
 
         document.getElementById('start-btn').addEventListener('click', async () => {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -779,10 +646,7 @@
             uiLayer.classList.add('hidden');
             uiLayer.style.backgroundImage = "none";
             uiLayer.style.backgroundColor = "transparent";
-            
-            // 重要：遊戲開始前，確保標題是遊戲標題（如果從勝利畫面重來）
             resetStartScreen();
-
             initGame();
         }
 
