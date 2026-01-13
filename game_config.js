@@ -30,7 +30,7 @@ window.GAME_CONFIG = {
     style: {
         wallColor: "#4B678E", 
         wallGlow: false,      
-        wallThickness: 5,     
+        wallThickness: 10,     
         playerColor: "#e74c3c", 
         goalColor: "#2ecc71"
     },
@@ -111,4 +111,5 @@ window.GAME_CONFIG = {
         }
     }
 };
+
 
