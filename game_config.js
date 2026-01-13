@@ -51,8 +51,8 @@ window.GAME_CONFIG = {
     // 5. ⚙️ 物理與迷宮參數
     // ------------------------------------------
     physics: {
-        cellSize: 80,          
-        ballRadiusRatio: 0.35, 
+        cellSize: 50,          
+        ballRadiusRatio: 0.4, 
         friction: 0.94,        
         acceleration: 0.6,     
         maxSpeed: 7,          
@@ -111,6 +111,7 @@ window.GAME_CONFIG = {
         }
     }
 };
+
 
 
 
