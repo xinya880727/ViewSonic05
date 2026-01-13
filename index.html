@@ -71,32 +71,23 @@
             pointer-events: none;
         }
 
-        /* [關鍵修改] 內容容器：透明且響應式縮放 */
+        /* 內容容器：透明且響應式縮放 */
         #menu-container {
             display: flex;
             flex-direction: column; 
             align-items: center;    
             justify-content: center;
             
-            /* 使用 vh (視窗高度) 控制間距，讓它在矮螢幕(橫向手機)時自動縮小間距 */
             gap: clamp(10px, 3vh, 30px);
-            
-            /* [RWD 設定] */
-            /* 預設佔寬度 85% (手機時會自動內縮，不佔滿) */
             width: 85%;
-            /* 最大寬度限制，避免電腦版太寬 */
             max-width: 500px;
-            
             padding: 20px;
-            
-            /* [透明背景設定] */
             background: transparent; 
             box-shadow: none;
             backdrop-filter: none;
         }
 
         h1 {
-            /* [RWD 字體] clamp(最小值, 視窗寬度比例, 最大值) */
             font-size: clamp(2.5rem, 10vw, 4rem);
             color: #f1c40f;
             text-transform: uppercase;
@@ -108,7 +99,6 @@
         }
 
         p {
-            /* [RWD 字體] 手機 1rem ~ 電腦 1.3rem */
             font-size: clamp(1rem, 4vw, 1.3rem);
             line-height: 1.6;
             color: #bdc3c7;
@@ -124,11 +114,8 @@
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
             color: white;
             border: none;
-            
-            /* [RWD 按鈕尺寸] */
             padding: clamp(10px, 2vh, 15px) clamp(30px, 5vw, 50px);
             font-size: clamp(1.1rem, 4vw, 1.5rem);
-            
             border-radius: 8px;
             cursor: pointer;
             box-shadow: 0 5px 15px rgba(192, 57, 43, 0.4);
@@ -208,7 +195,6 @@
             style: { wallColor: "#7f8c8d", wallGlow: true, wallThickness: 4, playerColor: "#e74c3c", goalColor: "#2ecc71" },
             text: { gameTitle: "迷宮逃脫", winTitle: "逃脫成功！", startMessage: "...", startButton: "開始", winMessage: "勝利！", nextLevelButton: "重試" },
             textStyle: {
-                // 使用 clamp 設定預設值，確保即使沒有 config 也能 RWD
                 title: { color: "#f1c40f", size: "clamp(2.5rem, 10vw, 4rem)", shadow: "0 0 10px rgba(241, 196, 15, 0.5)" },
                 winTitle: { color: "#2ecc71", size: "clamp(2.5rem, 10vw, 4rem)", shadow: "0 0 20px rgba(46, 204, 113, 0.8)" },
                 message: { color: "#bdc3c7", size: "clamp(1rem, 4vw, 1.3rem)", shadow: "1px 1px 2px rgba(0,0,0,0.8)" },
@@ -265,7 +251,6 @@
                 if (isButton) element.style.boxShadow = styleObj.shadow;
                 else element.style.textShadow = styleObj.shadow;
             }
-            // 移除絕對定位，強制使用 Flex 容器排版
             element.style.position = ""; 
             element.style.top = "";
             element.style.bottom = "";
@@ -425,7 +410,6 @@
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            // 直接速度控制 (保留您滿意的陀螺儀操作感)
             ball.vx = input.x * CONFIG.maxSpeed;
             ball.vy = input.y * CONFIG.maxSpeed;
 
@@ -548,12 +532,26 @@
 
         window.addEventListener('resize', () => {});
 
-        // 簡單陀螺儀邏輯 (保留您原始版本)
+        // [陀螺儀方向修正版]
         function handleOrientation(event) {
-            let x = event.gamma; 
-            let y = event.beta;
+            let rawBeta = event.beta;  
+            let rawGamma = event.gamma; 
             
-            if (x === null || y === null) return;
+            if (rawBeta === null || rawGamma === null) return;
+
+            let x, y;
+
+            // 自動偵測是否為橫向模式 (平板/寬螢幕)
+            if (window.innerWidth > window.innerHeight) {
+                // 橫向模式下：Beta 控制左右 (X)，Gamma 控制前後 (Y)
+                // 修正「前傾變右移」的問題：前傾應對應 Y 軸變化
+                x = rawBeta; 
+                y = -rawGamma; // 負號視實際裝置而定，通常需要反轉
+            } else {
+                // 直向模式下：Gamma 控制左右 (X)，Beta 控制前後 (Y)
+                x = rawGamma;
+                y = rawBeta;
+            }
 
             const maxTilt = 30; 
             
