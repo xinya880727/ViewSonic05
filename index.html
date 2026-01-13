@@ -331,8 +331,13 @@
             const offsetX = (canvas.width - cols * finalSize) / 2;
             const offsetY = (canvas.height - rows * finalSize) / 2;
 
+            // [核心修正] 計算速度縮放比例 (實際格子大小 / 預設格子大小)
+            // 當格子變小 (手機版)，這個比例會小於 1，讓速度變慢
+            const speedScale = finalSize / CONFIG.cellSize;
+
             mazeState = {
-                cols: cols, rows: rows, cellSize: finalSize, offsetX: offsetX, offsetY: offsetY, grid: []
+                cols: cols, rows: rows, cellSize: finalSize, offsetX: offsetX, offsetY: offsetY, grid: [],
+                speedScale: speedScale // 儲存這個比例供 update 使用
             };
 
             generateMaze();
@@ -404,14 +409,18 @@
             goal.row = rows - 1;
         }
 
-        // --- 物理更新 ---
+        // --- 物理更新 (加入速度自動縮放) ---
         function update(dt) {
             if (!isPlaying) return;
             timer += dt / 1000;
             timeDisplay.innerText = timer.toFixed(1);
 
-            ball.vx = input.x * CONFIG.maxSpeed;
-            ball.vy = input.y * CONFIG.maxSpeed;
+            // [核心修正] 應用速度縮放
+            // 基礎最大速度 * 縮放比例
+            const effectiveSpeed = CONFIG.maxSpeed * (mazeState.speedScale || 1);
+
+            ball.vx = input.x * effectiveSpeed;
+            ball.vy = input.y * effectiveSpeed;
 
             let nextX = ball.x + ball.vx;
             let nextY = ball.y + ball.vy;
@@ -541,14 +550,10 @@
 
             let x, y;
 
-            // 自動偵測是否為橫向模式 (平板/寬螢幕)
             if (window.innerWidth > window.innerHeight) {
-                // 橫向模式下：Beta 控制左右 (X)，Gamma 控制前後 (Y)
-                // 修正「前傾變右移」的問題：前傾應對應 Y 軸變化
                 x = rawBeta; 
-                y = -rawGamma; // 負號視實際裝置而定，通常需要反轉
+                y = -rawGamma; 
             } else {
-                // 直向模式下：Gamma 控制左右 (X)，Beta 控制前後 (Y)
                 x = rawGamma;
                 y = rawBeta;
             }
