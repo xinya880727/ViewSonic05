@@ -54,7 +54,10 @@ window.GAME_CONFIG = {
         cellSize: 30,          
         ballRadiusRatio: 0.4, 
         friction: 0.94,        
-        acceleration: 0.6,     
+        acceleration: 0.6,   
+        // [移動速度控制] 
+        // 數值越小 = 移動越慢
+        // 建議範圍：4 (慢) ~ 15 (快)        
         maxSpeed: 5,          
         keyboardForce: 1.5     
     },
@@ -111,6 +114,7 @@ window.GAME_CONFIG = {
         }
     }
 };
+
 
 
 
