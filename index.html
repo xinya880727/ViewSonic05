@@ -54,13 +54,16 @@
             background: transparent;
             background-size: cover;
             background-position: center;
+            
+            /* 修正：恢復 flex 佈局作為預設值，以防某些元素沒有設定絕對定位時會跑版 */
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            gap: 20px; /* 增加間距，讓沒有定位的元素不會黏在一起 */
+            
             z-index: 999;
-            text-align: center;
-            padding: 20px;
+            padding: 0;
             transition: background-color 0.5s ease, opacity 0.3s ease;
             pointer-events: auto;
         }
@@ -71,9 +74,15 @@
         }
 
         /* 預設樣式，會被 JS 設定覆蓋 */
+        h1, p, button {
+            position: relative;
+            margin: 0;
+            text-align: center;
+            white-space: nowrap; /* 防止文字換行影響定位 */
+        }
+
         h1 {
             font-size: 2.5rem;
-            margin-bottom: 15px;
             color: #f1c40f;
             text-transform: uppercase;
             letter-spacing: 3px;
@@ -82,10 +91,8 @@
 
         p {
             font-size: 1.1rem;
-            margin-bottom: 30px;
             line-height: 1.6;
             color: #bdc3c7;
-            max-width: 80%;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
         }
 
@@ -105,13 +112,18 @@
         }
 
         button:hover {
-            transform: translateY(-2px);
+            transform: translateX(-50%) translateY(-2px); /* 假設有置中，若無則 JS 會覆寫 */
             filter: brightness(1.1);
         }
 
         button:active {
-            transform: translateY(2px);
+            transform: translateX(-50%) translateY(2px);
             filter: brightness(0.9);
+        }
+
+        /* 簡單的按鈕 hover 修正，針對未定位的情況 */
+        button:not([style*="absolute"]):hover {
+             transform: translateY(-2px);
         }
 
         #info-bar {
@@ -169,20 +181,42 @@
             physics: { cellSize: 50, ballRadiusRatio: 0.35, friction: 0.94, acceleration: 0.6, maxSpeed: 12, keyboardForce: 1.5 },
             assets: { gameBg: "", startScreenBg: "", endScreenBg: "", player: "", goal: "" },
             style: { wallColor: "#7f8c8d", wallGlow: true, wallThickness: 4, playerColor: "#e74c3c", goalColor: "#2ecc71" },
-            text: { gameTitle: "迷宮逃脫", startMessage: "...", startButton: "開始", winMessage: "勝利！", nextLevelButton: "重試" },
+            text: { gameTitle: "迷宮逃脫", winTitle: "逃脫成功！", startMessage: "...", startButton: "開始", winMessage: "勝利！", nextLevelButton: "重試" },
             // 預設文字樣式
             textStyle: {
-                title: { color: "#f1c40f", size: "2.5rem", shadow: "0 0 10px rgba(241, 196, 15, 0.5)" },
-                message: { color: "#bdc3c7", size: "1.1rem", shadow: "1px 1px 2px rgba(0,0,0,0.8)" },
-                button: { color: "#ffffff", size: "1.3rem", shadow: "0 5px 15px rgba(192, 57, 43, 0.4)" }
+                title: { color: "#f1c40f", size: "2.5rem", shadow: "0 0 10px rgba(241, 196, 15, 0.5)", position: { top: "15%", left: "50%" } },
+                winTitle: { color: "#2ecc71", size: "3rem", shadow: "0 0 20px rgba(46, 204, 113, 0.8)", position: { top: "20%", left: "50%" } },
+                message: { color: "#bdc3c7", size: "1.1rem", shadow: "1px 1px 2px rgba(0,0,0,0.8)", position: { top: "40%", left: "50%" } },
+                winMessage: { color: "#ffffff", size: "1.5rem", shadow: "0 0 10px rgba(255, 255, 255, 0.8)", position: { top: "45%", left: "50%" } },
+                button: { 
+                    color: "#ffffff", 
+                    bgColor: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)",
+                    size: "1.3rem", 
+                    shadow: "0 5px 15px rgba(192, 57, 43, 0.4)",
+                    position: { bottom: "20%", left: "50%" }
+                }
             }
         };
 
         if (typeof window.GAME_CONFIG !== 'undefined') {
             currentConfig = window.GAME_CONFIG;
-            // 防呆：如果舊的 config 缺少某些欄位
-            if (!currentConfig.scale) currentConfig.scale = DEFAULT_CONFIG.scale;
-            if (!currentConfig.textStyle) currentConfig.textStyle = DEFAULT_CONFIG.textStyle;
+            
+            // --- 防呆機制補強 ---
+            // 確保 textStyle 結構存在
+            if (!currentConfig.textStyle) currentConfig.textStyle = JSON.parse(JSON.stringify(DEFAULT_CONFIG.textStyle));
+
+            // 確保必要的文字欄位存在
+            if (!currentConfig.text.winTitle) currentConfig.text.winTitle = DEFAULT_CONFIG.text.winTitle;
+
+            // 檢查每個元件的 position，如果缺失則補上預設值
+            ['title', 'winTitle', 'message', 'winMessage', 'button'].forEach(key => {
+                if (!currentConfig.textStyle[key]) {
+                    currentConfig.textStyle[key] = DEFAULT_CONFIG.textStyle[key];
+                } else if (!currentConfig.textStyle[key].position) {
+                    currentConfig.textStyle[key].position = DEFAULT_CONFIG.textStyle[key].position;
+                }
+            });
+
         } else {
             console.warn("⚠️ 警告：無法讀取 game_config.js。使用預設模式。");
             currentConfig = DEFAULT_CONFIG;
@@ -197,34 +231,63 @@
 
         // --- 2. 應用設定到介面 ---
         
-        // 內容
-        document.title = THEME.gameTitle;
         const titleEl = document.getElementById('game-title');
         const msgEl = document.getElementById('ui-message');
         const btnEl = document.getElementById('start-btn');
 
-        titleEl.innerText = THEME.gameTitle;
-        msgEl.innerHTML = THEME.startMessage;
-        btnEl.innerText = THEME.startButton;
+        // 初始化開始畫面
+        function resetStartScreen() {
+            titleEl.innerText = THEME.gameTitle;
+            msgEl.innerHTML = THEME.startMessage;
+            btnEl.innerText = THEME.startButton;
+            
+            applyStyle(titleEl, TEXT_STYLE.title);
+            applyStyle(msgEl, TEXT_STYLE.message);
+            applyStyle(btnEl, TEXT_STYLE.button, true);
+        }
 
-        // 套用文字樣式 (新功能)
+        // 套用樣式與位置
         function applyStyle(element, styleObj, isButton = false) {
             if (!element || !styleObj) return;
+            
+            // 外觀
             if (styleObj.color) element.style.color = styleObj.color;
             if (styleObj.size) element.style.fontSize = styleObj.size;
+            if (styleObj.bgColor) element.style.background = styleObj.bgColor;
             
             if (styleObj.shadow) {
                 if (isButton) {
-                    element.style.boxShadow = styleObj.shadow; // 按鈕用 box-shadow
+                    element.style.boxShadow = styleObj.shadow;
                 } else {
-                    element.style.textShadow = styleObj.shadow; // 文字用 text-shadow
+                    element.style.textShadow = styleObj.shadow;
+                }
+            }
+
+            // 位置 (Position)
+            element.style.position = ""; 
+            element.style.top = "";
+            element.style.bottom = "";
+            element.style.left = "";
+            element.style.right = "";
+            element.style.transform = "";
+
+            if (styleObj.position) {
+                element.style.position = "absolute"; 
+                const pos = styleObj.position;
+                
+                if (pos.top !== undefined) element.style.top = pos.top;
+                if (pos.bottom !== undefined) element.style.bottom = pos.bottom;
+                if (pos.left !== undefined) element.style.left = pos.left;
+                if (pos.right !== undefined) element.style.right = pos.right;
+
+                if (pos.left === "50%") {
+                    element.style.transform = "translateX(-50%)";
                 }
             }
         }
 
-        applyStyle(titleEl, TEXT_STYLE.title);
-        applyStyle(msgEl, TEXT_STYLE.message);
-        applyStyle(btnEl, TEXT_STYLE.button, true);
+        // 執行初始化
+        resetStartScreen();
 
 
         // --- 變數宣告 ---
@@ -464,8 +527,22 @@
             btnEl.innerText = THEME.nextLevelButton;
             uiLayer.classList.remove('hidden');
 
-            // 遊戲結束時，加上半透明黑色底圖，覆蓋全螢幕
             uiLayer.style.backgroundColor = "rgba(0, 0, 0, 0.85)";
+
+            // 1. 修改標題文字為「勝利標題」
+            if (THEME.winTitle) {
+                titleEl.innerText = THEME.winTitle;
+            }
+            
+            // 2. 套用「勝利標題」樣式
+            if (TEXT_STYLE.winTitle) {
+                applyStyle(titleEl, TEXT_STYLE.winTitle);
+            }
+
+            // 3. 套用「勝利訊息」樣式
+            if (TEXT_STYLE.winMessage) {
+                applyStyle(msgEl, TEXT_STYLE.winMessage);
+            }
 
             if (assetsLoaded.endBg) {
                 uiLayer.style.backgroundImage = `url('${THEME.endScreenBg}')`;
@@ -599,14 +676,50 @@
         window.addEventListener('resize', () => {
         });
 
+        // 修正後的陀螺儀控制 (支援橫向/平板)
         function handleOrientation(event) {
-            let x = event.gamma; 
-            let y = event.beta;
+            let x = event.gamma; // 左/右傾斜 (直向時)
+            let y = event.beta;  // 前/後傾斜 (直向時)
+            
+            // 取得螢幕旋轉角度 (相容性處理)
+            let angle = 0;
+            if (window.screen && window.screen.orientation) {
+                angle = window.screen.orientation.angle;
+            } else if (typeof window.orientation !== 'undefined') {
+                angle = window.orientation;
+            }
+
+            let inputX = 0;
+            let inputY = 0;
+
+            // 根據角度修正座標軸
+            if (angle === 90) {
+                // 橫向 (Home 鍵在右 / 鏡頭在左)
+                inputX = y;
+                inputY = -x;
+            } else if (angle === -90 || angle === 270) {
+                // 橫向 (Home 鍵在左 / 鏡頭在右)
+                inputX = -y;
+                inputY = x;
+            } else if (angle === 180) {
+                // 倒置
+                inputX = -x;
+                inputY = -y;
+            } else {
+                // 直向 (預設)
+                inputX = x;
+                inputY = y;
+            }
+
             const maxTilt = 45;
-            if (x > maxTilt) x = maxTilt; if (x < -maxTilt) x = -maxTilt;
-            if (y > maxTilt) y = maxTilt; if (y < -maxTilt) y = -maxTilt;
-            input.x = x / maxTilt;
-            input.y = y / maxTilt;
+            
+            if (inputX > maxTilt) inputX = maxTilt; 
+            if (inputX < -maxTilt) inputX = -maxTilt;
+            if (inputY > maxTilt) inputY = maxTilt; 
+            if (inputY < -maxTilt) inputY = -maxTilt;
+            
+            input.x = inputX / maxTilt;
+            input.y = inputY / maxTilt;
         }
 
         window.addEventListener('keydown', (e) => {
@@ -664,6 +777,10 @@
             uiLayer.classList.add('hidden');
             uiLayer.style.backgroundImage = "none";
             uiLayer.style.backgroundColor = "transparent";
+            
+            // 重要：遊戲開始前，確保標題是遊戲標題（如果從勝利畫面重來）
+            resetStartScreen();
+
             initGame();
         }
 
