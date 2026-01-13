@@ -29,7 +29,8 @@ window.GAME_CONFIG = {
     // ------------------------------------------
     style: {
         wallColor: "#4B678E", 
-        wallGlow: false,      
+        wallGlow: false,  
+// [迷宮線粗]         
         wallThickness: 5,     
         playerColor: "#e74c3c", 
         goalColor: "#2ecc71"
@@ -51,6 +52,7 @@ window.GAME_CONFIG = {
     // 5. ⚙️ 物理與迷宮參數
     // ------------------------------------------
     physics: {
+// [迷宮難度，數字越大越簡單] 
         cellSize: 50,          
         ballRadiusRatio: 0.4, 
         friction: 0.94,        
@@ -114,6 +116,7 @@ window.GAME_CONFIG = {
         }
     }
 };
+
 
 
 
