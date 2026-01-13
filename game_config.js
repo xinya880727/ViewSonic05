@@ -41,8 +41,9 @@ window.GAME_CONFIG = {
     text: {
         gameTitle: "迷宮",
         startMessage: "<br>傾斜裝置或滑動滑鼠來移動。",
+        winTitle: "逃脫成功！", 
         startButton: "開始逃脫",
-        winMessage: "任務完成！<br>本次耗時: <span style='color:#f1c40f'>{time}</span> 秒",
+        winMessage: "<br>耗時: <span style='color:#f1c40f'>{time}</span> 秒",
         nextLevelButton: "再次挑戰"
     },
 
@@ -67,28 +68,36 @@ window.GAME_CONFIG = {
         // [遊戲標題]
         title: {
             color: "#000000",
-            size: "4rem",
+            size: "6rem",
             shadow: "0 0 0px rgba(241, 196, 15, 0.5)",
             // 位置設定 (距離上方 15%，水平置中)
-            position: { top: "15%", left: "50%" } 
+            position: { bottom: "50%", left: "50%" } 
+        },
+
+       // [遊戲結束-勝利標題] (新增)
+        winTitle: {
+            color: "#2ecc71",
+            size: "6rem",
+            shadow: "0 0 20px rgba(46, 204, 113, 0.8)",
+            position: { bottom: "50%", left: "50%" } 
         },
 
         // [開始畫面-說明文字]
         message: {
             color: "#000000",
-            size: "1.1rem",
-            shadow: "0px 0px 0px rgba(0,0,0,0.8)",
+            size: "1.2rem",
+            shadow: "0px 0px 1px rgba(0,0,0,0.8)",
             // 位置設定 (距離上方 20%，水平置中)
-            position: { top: "20%", left: "50%" }
+            position: { bottom: "35%", left: "50%" }
         },
 
         // [結束畫面-勝利文字]
         winMessage: {
             color: "#ffffff",
-            size: "1.8rem",
+            size: "1.2rem",
             shadow: "0 0 15px rgba(255, 255, 255, 0.6)",
             // 位置設定 (距離上方 35%，水平置中)
-            position: { top: "35%", left: "50%" }
+            position: { bottom: "35%", left: "50%" }
         },
 
         // [按鈕]
@@ -98,7 +107,7 @@ window.GAME_CONFIG = {
             size: "1.3rem",
             shadow: "0 5px 15px rgba(0, 0, 0, 0)",
             // 位置設定 (距離下方 20%，水平置中)
-            position: { bottom: "20%", left: "50%" }
+            position: { bottom: "40%", left: "50%" }
         }
     }
 };
