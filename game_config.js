@@ -88,7 +88,7 @@ window.GAME_CONFIG = {
             size: "1.2rem",
             shadow: "0px 0px 1px rgba(0,0,0,0.8)",
             // 位置設定 (距離上方 20%，水平置中)
-            position: { bottom: "35%", left: "50%" }
+            position: { bottom: "40%", left: "50%" }
         },
 
         // [結束畫面-勝利文字]
@@ -97,7 +97,7 @@ window.GAME_CONFIG = {
             size: "1.2rem",
             shadow: "0 0 15px rgba(255, 255, 255, 0.6)",
             // 位置設定 (距離上方 35%，水平置中)
-            position: { bottom: "35%", left: "50%" }
+            position: { bottom: "40%", left: "50%" }
         },
 
         // [按鈕]
@@ -107,9 +107,10 @@ window.GAME_CONFIG = {
             size: "1.3rem",
             shadow: "0 5px 15px rgba(0, 0, 0, 0)",
             // 位置設定 (距離下方 20%，水平置中)
-            position: { bottom: "40%", left: "50%" }
+            position: { bottom: "45%", left: "50%" }
         }
     }
 };
+
 
 
